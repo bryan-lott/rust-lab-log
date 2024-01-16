@@ -8,7 +8,7 @@ use clap::Parser;
 #[derive(Parser)]
 struct Cli {
     /// Optional filename to save the log to
-    #[arg(short, long, default_value = "~/lab-log.md")]
+    #[arg(short, long, default_value = "/Users/blott/Dropbox/notes/rlg.md")]
     file: Option<std::path::PathBuf>,
 
     /// Text to save to the log
@@ -16,7 +16,7 @@ struct Cli {
     text: Vec<String>,
 }
 
-fn append_to_file(path: std::path::PathBuf, text: String) {
+fn append_to_file(path: &std::path::PathBuf, text: String) {
     let file = OpenOptions::new().append(true).create(true).open(path);
 
     match file {
@@ -40,7 +40,6 @@ fn append_headers(path: &std::path::PathBuf, datetime: DateTime<Local>) -> Strin
             let day = datetime.format("%Y-%m-%d").to_string();
 
             for line in RevLines::new(f) {
-                println!("{}", line.as_ref().unwrap());
                 match line {
                     Ok(line) => {
                         if line.trim().is_empty() {
@@ -64,6 +63,26 @@ fn append_headers(path: &std::path::PathBuf, datetime: DateTime<Local>) -> Strin
     return headers;
 }
 
+fn print_last_n_lines(path: &std::path::PathBuf, num_lines: usize) {
+    let file = File::open(path);
+    match file {
+        Ok(f) => {
+            println!(
+                "====================| Last {} lines |====================",
+                num_lines
+            );
+            let lines = RevLines::new(f).take(num_lines).collect::<Vec<_>>();
+            for line in lines.into_iter().rev() {
+                match line {
+                    Ok(line) => println!("{}", line),
+                    Err(e) => eprintln!("Error reading line: {}", e),
+                }
+            }
+        }
+        Err(e) => eprintln!("Couldn't open file: {}", e),
+    }
+}
+
 fn main() {
     let args = Cli::parse();
     let text = args.text.join(" ");
@@ -75,13 +94,15 @@ fn main() {
     let datetime_str = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
     log_entry.push_str(&format!("- {}: {}", datetime_str, text));
 
-    append_to_file(args.file.unwrap(), log_entry);
+    append_to_file(args.file.as_ref().unwrap(), log_entry);
+    print_last_n_lines(&args.file.as_ref().unwrap(), 5);
 }
 
 /*
 * TODO:
-* - [X] Append text to file
-* - [X] Add timestamp to file
-* - [X] Add day header whenever the day changes
-* - [X] Add year header whenever the year changes
+* - [x] Reverse the printout of last lines
+* - [x] Append text to file
+* - [x] Add timestamp to file
+* - [x] Add day header whenever the day changes
+* - [x] Add year header whenever the year changes
 */
