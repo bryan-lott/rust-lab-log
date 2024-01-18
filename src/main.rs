@@ -34,7 +34,7 @@ fn day_header(datetime: DateTime<Local>) -> String {
     format!("\n\n### {}\n", datetime.format("%Y-%m-%d"))
 }
 
-fn append_headers(path: &File, datetime: DateTime<Local>) -> String {
+fn determine_headers(path: &File, datetime: DateTime<Local>) -> String {
     let mut headers = String::new();
     let year = datetime.format("%Y").to_string();
     let day = datetime.format("%Y-%m-%d").to_string();
@@ -54,7 +54,11 @@ fn append_headers(path: &File, datetime: DateTime<Local>) -> String {
                 headers.push_str(&day_header(datetime));
                 return headers;
             }
-            Err(e) => eprintln!("Error reading line: {}", e),
+            // We don't have a valid log line at this point???
+            Err(e) => {
+                eprintln!("Error reading line: {}", e);
+                return headers;
+            }
         }
     }
     if headers.is_empty() {
@@ -80,13 +84,12 @@ fn print_last_n_lines(path: File, num_lines: usize) {
 }
 
 fn main() {
-    // let args = Cli::parse();
+    // Get the default log file
+    let mut default_log_file_path = home_dir().expect("Couldn't get home directory");
+    default_log_file_path.push("rlg.md");
+    let default_file_arg = default_log_file_path.as_mut_os_string().clone();
 
-    let mut default_log_file = home_dir().expect("Couldn't get home directory");
-    default_log_file.push("rlg.md");
-    let file = default_log_file.as_mut_os_string();
-
-    // let default_log_file = "/Users/blott/Dropbox/notes/rlg.md";
+    // Parse the command line args
     let args = command!()
         .arg(
             arg!([file] "Optional file to save the new log entry to")
@@ -94,46 +97,54 @@ fn main() {
                 .long("file")
                 .value_name("file")
                 .required(false)
-                .default_value(file.clone())
-                // .default_value("/Users/blott/Dropbox/notes/rlg.md")
+                .default_value(default_file_arg)
                 .value_parser(value_parser!(PathBuf)),
         )
         .arg(
             arg!([text] "Text to save to the log" )
                 .value_name("text")
-                .required(true)
+                .required(false)
+                .default_value("testing!")
                 .trailing_var_arg(true)
                 .action(ArgAction::Append)
                 .value_parser(value_parser!(String)),
         )
         .get_matches();
-    let text: String = args
+    let text_arg: String = args
         .get_many::<String>("text")
         .expect("No text provided")
         .cloned()
         .collect::<Vec<String>>()
         .join(" ");
-    // let text = args.text.join(" ");
-    let datetime = Local::now();
-    let datetime_str = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+    let log_file_path_arg = args.get_one::<PathBuf>("file").expect("Invalid file");
+
+    // Set our datetime
+    let datetime_now = Local::now();
+    let datetime_str = datetime_now.format("%Y-%m-%d %H:%M:%S").to_string();
     let mut log_entry = String::new().to_owned();
 
-    let file_path = args.get_one::<PathBuf>("file").expect("Invalid file");
-    let file = OpenOptions::new().append(true).create(true).open(file_path);
+    // Open and write the log entry to the file
+    let file = OpenOptions::new()
+        .read(true)
+        .append(true)
+        .create(true)
+        .open(log_file_path_arg);
     match file {
         Ok(f) => {
-            log_entry.push_str(append_headers(&f, datetime).as_str());
-            log_entry.push_str(&format!("- {}: {}", datetime_str, text));
+            log_entry.push_str(determine_headers(&f, datetime_now).as_str());
+            log_entry.push_str(&format!("- {}: {}", datetime_str, text_arg));
             append_to_file(&f, log_entry);
         }
         Err(e) => {
             println!("Unable to open file: {}", e);
         }
     }
+
+    // Finally, provide feedback on what was just added to the log with context
     print_last_n_lines(
         OpenOptions::new()
             .read(true)
-            .open(file_path)
+            .open(log_file_path_arg)
             .expect("Unable to read log file"),
         6,
     );
