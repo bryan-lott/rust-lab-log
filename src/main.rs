@@ -1,24 +1,28 @@
-use dirs::home_dir;
-use rev_lines::RevLines;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::path::PathBuf;
-
 use chrono::{DateTime, Local};
 use clap::{arg, command, value_parser, ArgAction};
+use dirs::{config_dir, home_dir};
+use rev_lines::RevLines;
+use serde::Deserialize;
+use std::fs::{read_to_string, File, OpenOptions};
+use std::io::Write;
+use std::path::PathBuf;
+use toml;
 
-/*
-#[derive(Parser)]
-struct Cli {
-    /// Optional filename to save the log to
-    #[arg(short, long, default_value = "/Users/blott/Dropbox/notes/rlg.md")]
-    file: Option<std::path::PathBuf>,
-
-    /// Text to save to the log
-    #[arg(trailing_var_arg = true)]
-    text: Vec<String>,
+#[derive(Deserialize, Debug)]
+#[serde(default)]
+struct Config {
+    default_log_file: PathBuf,
+    style: String,
 }
-*/
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            default_log_file: default_log_file_path().into(),
+            style: "markdown".to_string(),
+        }
+    }
+}
 
 fn append_to_file(mut path: &File, text: String) {
     if let Err(e) = writeln!(path, "{}", text) {
@@ -69,10 +73,10 @@ fn determine_headers(path: &File, datetime: DateTime<Local>) -> String {
     return headers;
 }
 
-fn print_last_n_lines(path: File, num_lines: usize) {
+fn print_last_n_lines(path: File, log_file_path_arg: &str, num_lines: usize) {
     println!(
-        "====================| Last {} lines |====================",
-        num_lines
+        "====================| Last {} lines of {} |====================",
+        num_lines, log_file_path_arg
     );
     let lines = RevLines::new(path).take(num_lines).collect::<Vec<_>>();
     for line in lines.into_iter().rev() {
@@ -83,12 +87,62 @@ fn print_last_n_lines(path: File, num_lines: usize) {
     }
 }
 
-fn main() {
-    // Get the default log file
-    let mut default_log_file_path = home_dir().expect("Couldn't get home directory");
-    default_log_file_path.push("rlg.md");
-    let default_file_arg = default_log_file_path.as_mut_os_string().clone();
+fn default_log_file_path() -> std::ffi::OsString {
+    home_dir()
+        .expect("Couldn't get home directory")
+        .join("rlg.md")
+        .into_os_string()
+}
 
+fn canonicalize_log_file_path(mut config: Config) -> Config {
+    let first = config
+        .default_log_file
+        .components()
+        .collect::<Vec<_>>()
+        .first()
+        .unwrap()
+        .as_os_str();
+    if first == "~" {
+        config.default_log_file = home_dir()
+            .expect("Couldn't get home directory")
+            .join(config.default_log_file.strip_prefix("~").unwrap())
+            .canonicalize()
+            .unwrap();
+    } else if first == "$HOME" {
+        config.default_log_file = home_dir()
+            .expect("Couldn't get home directory")
+            .join(config.default_log_file.strip_prefix("$HOME").unwrap())
+            .canonicalize()
+            .unwrap();
+    }
+    config
+}
+
+fn get_config() -> Config {
+    match read_to_string(
+        config_dir()
+            .expect("Couldn't get config directory")
+            .join("rlg.toml")
+            .as_os_str()
+            .to_str()
+            .unwrap(),
+    ) {
+        Ok(config_file_path) => match toml::from_str::<Config>(&config_file_path.to_string()) {
+            Ok(config) => canonicalize_log_file_path(config),
+            Err(e) => {
+                eprintln!("Unable to parse config: {}", e);
+                Config::default()
+            }
+        },
+        Err(_) => {
+            eprintln!("No config file found, using defaults");
+            Config::default()
+        }
+    }
+}
+
+fn main() {
+    let config = get_config();
     // Parse the command line args
     let args = command!()
         .arg(
@@ -97,7 +151,7 @@ fn main() {
                 .long("file")
                 .value_name("file")
                 .required(false)
-                .default_value(default_file_arg)
+                .default_value(config.default_log_file.into_os_string())
                 .value_parser(value_parser!(PathBuf)),
         )
         .arg(
@@ -146,13 +200,14 @@ fn main() {
             .read(true)
             .open(log_file_path_arg)
             .expect("Unable to read log file"),
+        &log_file_path_arg.display().to_string(),
         6,
     );
 }
 
 /*
 * TODO:
-* - [ ] Add a ~/.config/rlg.toml config file allowing a custom default log file location
+* - [x] Add a ~/.config/rlg.toml config file allowing a custom default log file location
 * - [x] Create a new file with appropriate headers if one doesn't exist
 * - [x] Only open the file once and pass it around
 * - [x] Get default log file working
