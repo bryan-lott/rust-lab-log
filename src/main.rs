@@ -24,9 +24,57 @@ impl Default for Config {
     }
 }
 
-fn append_to_file(mut path: &File, text: String) {
-    if let Err(e) = writeln!(path, "{}", text) {
-        eprintln!("Couldn't write to file: {}", e);
+fn default_log_file_path() -> std::ffi::OsString {
+    home_dir()
+        .expect("Couldn't get home directory")
+        .join("rlg.md")
+        .into_os_string()
+}
+
+fn canonicalize_log_file_path(mut config: Config) -> Config {
+    let first = config
+        .default_log_file
+        .components()
+        .collect::<Vec<_>>()
+        .first()
+        .unwrap()
+        .as_os_str();
+    if first == "~" {
+        config.default_log_file = home_dir()
+            .expect("Couldn't get home directory")
+            .join(config.default_log_file.strip_prefix("~").unwrap())
+            .canonicalize()
+            .unwrap();
+    } else if first == "$HOME" {
+        config.default_log_file = home_dir()
+            .expect("Couldn't get home directory")
+            .join(config.default_log_file.strip_prefix("$HOME").unwrap())
+            .canonicalize()
+            .unwrap();
+    }
+    config
+}
+
+fn get_config() -> Config {
+    match read_to_string(
+        config_dir()
+            .expect("Couldn't get config directory")
+            .join("rlg.toml")
+            .as_os_str()
+            .to_str()
+            .unwrap(),
+    ) {
+        Ok(config_file_path) => match toml::from_str::<Config>(&config_file_path.to_string()) {
+            Ok(config) => canonicalize_log_file_path(config),
+            Err(e) => {
+                eprintln!("Unable to parse config: {}", e);
+                Config::default()
+            }
+        },
+        Err(_) => {
+            eprintln!("No config file found, using defaults");
+            Config::default()
+        }
     }
 }
 
@@ -87,57 +135,9 @@ fn print_last_n_lines(path: File, log_file_path_arg: &str, num_lines: usize) {
     }
 }
 
-fn default_log_file_path() -> std::ffi::OsString {
-    home_dir()
-        .expect("Couldn't get home directory")
-        .join("rlg.md")
-        .into_os_string()
-}
-
-fn canonicalize_log_file_path(mut config: Config) -> Config {
-    let first = config
-        .default_log_file
-        .components()
-        .collect::<Vec<_>>()
-        .first()
-        .unwrap()
-        .as_os_str();
-    if first == "~" {
-        config.default_log_file = home_dir()
-            .expect("Couldn't get home directory")
-            .join(config.default_log_file.strip_prefix("~").unwrap())
-            .canonicalize()
-            .unwrap();
-    } else if first == "$HOME" {
-        config.default_log_file = home_dir()
-            .expect("Couldn't get home directory")
-            .join(config.default_log_file.strip_prefix("$HOME").unwrap())
-            .canonicalize()
-            .unwrap();
-    }
-    config
-}
-
-fn get_config() -> Config {
-    match read_to_string(
-        config_dir()
-            .expect("Couldn't get config directory")
-            .join("rlg.toml")
-            .as_os_str()
-            .to_str()
-            .unwrap(),
-    ) {
-        Ok(config_file_path) => match toml::from_str::<Config>(&config_file_path.to_string()) {
-            Ok(config) => canonicalize_log_file_path(config),
-            Err(e) => {
-                eprintln!("Unable to parse config: {}", e);
-                Config::default()
-            }
-        },
-        Err(_) => {
-            eprintln!("No config file found, using defaults");
-            Config::default()
-        }
+fn append_to_file(mut path: &File, text: String) {
+    if let Err(e) = writeln!(path, "{}", text) {
+        eprintln!("Couldn't write to file: {}", e);
     }
 }
 
