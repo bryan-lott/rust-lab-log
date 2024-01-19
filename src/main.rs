@@ -2,13 +2,13 @@ use chrono::{DateTime, Local};
 use clap::{arg, command, value_parser, ArgAction};
 use dirs::{config_dir, home_dir};
 use rev_lines::RevLines;
-use serde::Deserialize;
-use std::fs::{read_to_string, File, OpenOptions};
+use serde::{Deserialize, Serialize};
+use std::fs::{read_to_string, write, File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use toml;
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
 struct Config {
     default_log_file: PathBuf,
@@ -56,14 +56,11 @@ fn canonicalize_log_file_path(mut config: Config) -> Config {
 }
 
 fn get_config() -> Config {
-    match read_to_string(
-        config_dir()
-            .expect("Couldn't get config directory")
-            .join("rlg.toml")
-            .as_os_str()
-            .to_str()
-            .unwrap(),
-    ) {
+    let binding = config_dir()
+        .expect("Couldn't get config directory")
+        .join("rlg.toml");
+    let config_path = binding.as_os_str().to_str().unwrap();
+    match read_to_string(config_path) {
         Ok(config_file_path) => match toml::from_str::<Config>(&config_file_path.to_string()) {
             Ok(config) => canonicalize_log_file_path(config),
             Err(e) => {
@@ -72,7 +69,17 @@ fn get_config() -> Config {
             }
         },
         Err(_) => {
-            eprintln!("No config file found, using defaults");
+            println!(
+                "No config file found, creating default config at {}",
+                config_path
+            );
+            match write(
+                config_path,
+                toml::to_string_pretty::<Config>(&Config::default()).unwrap(),
+            ) {
+                Ok(_) => {}
+                Err(e) => eprintln!("Unable to write default config: {}", e),
+            }
             Config::default()
         }
     }
@@ -207,6 +214,7 @@ fn main() {
 
 /*
 * TODO:
+* - [x] Create a default config if one isn't found. Let the user know.
 * - [x] Add a ~/.config/rlg.toml config file allowing a custom default log file location
 * - [x] Create a new file with appropriate headers if one doesn't exist
 * - [x] Only open the file once and pass it around
