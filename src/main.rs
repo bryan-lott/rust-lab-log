@@ -214,6 +214,10 @@ fn main() {
 
 /*
 * TODO:
+* - [ ] Create a minimal TUI
+*   - [ ] Add creation of new log lines
+*   - [ ] Add view of existing log lines
+*   - [ ] Add deletion of existing log lines
 * - [x] Create a default config if one isn't found. Let the user know.
 * - [x] Add a ~/.config/rlg.toml config file allowing a custom default log file location
 * - [x] Create a new file with appropriate headers if one doesn't exist
