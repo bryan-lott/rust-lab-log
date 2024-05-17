@@ -214,6 +214,7 @@ fn main() {
 
 /*
 * TODO:
+* - [ ] If no args are provided, spit out the last n-lines of the log
 * - [ ] Create a minimal TUI
 *   - [ ] Add creation of new log lines
 *   - [ ] Add view of existing log lines
