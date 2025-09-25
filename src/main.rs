@@ -13,6 +13,7 @@ use toml;
 struct Config {
     default_log_file: PathBuf,
     style: String,
+    last_n_lines: usize,
 }
 
 impl Default for Config {
@@ -20,6 +21,7 @@ impl Default for Config {
         Self {
             default_log_file: default_log_file_path().into(),
             style: "markdown".to_string(),
+            last_n_lines: 6,
         }
     }
 }
@@ -148,6 +150,36 @@ fn append_to_file(mut path: &File, text: String) {
     }
 }
 
+fn open_log_file(file_path: &PathBuf) -> Result<File, std::io::Error> {
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .append(true)
+        .open(file_path)
+}
+
+fn write_to_log_file(file_path: &PathBuf, text: Option<&str>) -> Result<(), std::io::Error> {
+    let datetime_now = Local::now();
+    let file = open_log_file(file_path)?;
+    let mut log_entry = String::new();
+
+    log_entry.push_str(determine_headers(&file, datetime_now).as_str());
+    
+    if let Some(entry_text) = text {
+        let datetime_str = datetime_now.format("%Y-%m-%d %H:%M:%S").to_string();
+        log_entry.push_str(&format!("- {}: {}", datetime_str, entry_text));
+    }
+    
+    append_to_file(&file, log_entry);
+    
+    if text.is_none() {
+        println!("Created new log file: {}", file_path.display());
+    }
+    
+    Ok(())
+}
+
 fn main() {
     let config = get_config();
     // Parse the command line args
@@ -165,56 +197,54 @@ fn main() {
             arg!([text] "Text to save to the log" )
                 .value_name("text")
                 .required(false)
-                .default_value("testing!")
                 .trailing_var_arg(true)
                 .action(ArgAction::Append)
                 .value_parser(value_parser!(String)),
         )
         .get_matches();
-    let text_arg: String = args
-        .get_many::<String>("text")
-        .expect("No text provided")
-        .cloned()
-        .collect::<Vec<String>>()
-        .join(" ");
     let log_file_path_arg = args.get_one::<PathBuf>("file").expect("Invalid file");
 
-    // Set our datetime
-    let datetime_now = Local::now();
-    let datetime_str = datetime_now.format("%Y-%m-%d %H:%M:%S").to_string();
-    let mut log_entry = String::new().to_owned();
+    // Check if user provided any text arguments
+    let user_provided_text = args.contains_id("text");
 
-    // Open and write the log entry to the file
-    let file = OpenOptions::new()
-        .read(true)
-        .append(true)
-        .create(true)
-        .open(log_file_path_arg);
-    match file {
-        Ok(f) => {
-            log_entry.push_str(determine_headers(&f, datetime_now).as_str());
-            log_entry.push_str(&format!("- {}: {}", datetime_str, text_arg));
-            append_to_file(&f, log_entry);
-        }
-        Err(e) => {
-            println!("Unable to open file: {}", e);
+    if user_provided_text {
+        let text_arg: String = args
+            .get_many::<String>("text")
+            .expect("No text provided")
+            .cloned()
+            .collect::<Vec<String>>()
+            .join(" ");
+        
+        if let Err(e) = write_to_log_file(log_file_path_arg, Some(&text_arg)) {
+            println!("Unable to add log entry: {}", e);
         }
     }
 
-    // Finally, provide feedback on what was just added to the log with context
-    print_last_n_lines(
-        OpenOptions::new()
-            .read(true)
-            .open(log_file_path_arg)
-            .expect("Unable to read log file"),
-        &log_file_path_arg.display().to_string(),
-        6,
-    );
+    // Print the last n lines of the log file
+    let log_file = OpenOptions::new()
+        .read(true)
+        .open(log_file_path_arg);
+    
+    match log_file {
+        Ok(file) => {
+            print_last_n_lines(
+                file,
+                &log_file_path_arg.display().to_string(),
+                config.last_n_lines,
+            );
+        }
+        Err(_) => {
+            // Create the log file if it doesn't exist
+            if let Err(e) = write_to_log_file(log_file_path_arg, None) {
+                println!("Unable to create log file: {}", e);
+            }
+        }
+    }
 }
 
 /*
 * TODO:
-* - [ ] If no args are provided, spit out the last n-lines of the log
+* - [x] If no args are provided, spit out the last n-lines of the log
 * - [ ] Create a minimal TUI
 *   - [ ] Add creation of new log lines
 *   - [ ] Add view of existing log lines

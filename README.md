@@ -11,12 +11,6 @@ rlg "testing the lab logger"
 ```
 
 ```markdown
----
-id: rlg
-aliases: []
-tags: []
----
-
 # Rust Lab Log
 
 ## 2024
@@ -49,6 +43,26 @@ The first time rlg is run it will create a default config file and tell you wher
 ```toml
 default_log_file = "~/Dropbox/notes/rlg.md"
 style = "markdown"
+last_n_lines = 6
 ```
 
 Note: other styles aren't supported yet, but will be added maybe at some point.
+
+## Installation
+
+### From Source
+
+1. Clone this repo locally
+2. cargo install
+
+```shell
+cargo install --path .
+```
+
+## Build Instructions
+
+### Release Version
+
+```shell
+cargo build --release
+```
