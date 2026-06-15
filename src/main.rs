@@ -44,15 +44,11 @@ fn canonicalize_log_file_path(mut config: Config) -> Config {
     if first == "~" {
         config.default_log_file = home_dir()
             .expect("Couldn't get home directory")
-            .join(config.default_log_file.strip_prefix("~").unwrap())
-            .canonicalize()
-            .unwrap();
+            .join(config.default_log_file.strip_prefix("~").unwrap());
     } else if first == "$HOME" {
         config.default_log_file = home_dir()
             .expect("Couldn't get home directory")
-            .join(config.default_log_file.strip_prefix("$HOME").unwrap())
-            .canonicalize()
-            .unwrap();
+            .join(config.default_log_file.strip_prefix("$HOME").unwrap());
     }
     config
 }
