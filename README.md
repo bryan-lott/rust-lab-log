@@ -66,3 +66,15 @@ cargo install --path .
 ```shell
 cargo build --release
 ```
+## Development
+
+Enable the repo's git hooks once per clone:
+
+```shell
+git config core.hooksPath .githooks
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+The pre-commit hook blocks commits whose Rust code isn't `cargo fmt`-formatted.
+CI (`.github/workflows/ci.yml`) checks formatting, clippy (`-D warnings`),
+builds and tests on Linux, macOS and Windows, and runs `cargo deny`.

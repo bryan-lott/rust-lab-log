@@ -253,7 +253,6 @@ fn append_to_file(mut path: &File, text: String) {
 fn open_log_file(file_path: &PathBuf) -> Result<File, std::io::Error> {
     OpenOptions::new()
         .read(true)
-        .write(true)
         .create(true)
         .append(true)
         .open(file_path)
