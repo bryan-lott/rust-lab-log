@@ -1,9 +1,9 @@
 use chrono::{DateTime, Local};
-use clap::{arg, command, value_parser, ArgAction};
+use clap::{ArgAction, arg, command, value_parser};
 use dirs::{config_dir, home_dir};
 use rev_lines::RevLines;
 use serde::{Deserialize, Serialize};
-use std::fs::{read_to_string, write, File, OpenOptions};
+use std::fs::{File, OpenOptions, read_to_string, write};
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -29,7 +29,11 @@ impl Default for Config {
 }
 
 fn canonicalize_path(path: PathBuf) -> PathBuf {
-    match path.components().next().and_then(|c| c.as_os_str().to_str()) {
+    match path
+        .components()
+        .next()
+        .and_then(|c| c.as_os_str().to_str())
+    {
         Some("~") => home_dir()
             .expect("Couldn't get home directory")
             .join(path.strip_prefix("~").unwrap()),
@@ -57,7 +61,10 @@ fn get_config() -> Config {
             }
         },
         Err(_) => {
-            println!("No config file found, creating default config at {}", config_path.display());
+            println!(
+                "No config file found, creating default config at {}",
+                config_path.display()
+            );
             let config = Config::default();
             if let Err(e) = write(&config_path, toml::to_string_pretty(&config).unwrap()) {
                 eprintln!("Unable to write default config: {}", e);
@@ -126,7 +133,11 @@ fn print_todos(todos: &Todos, show_done: bool) {
 
 fn todo_add(todos: &mut Todos, text: &str) -> String {
     let id = todos.todos.iter().map(|t| t.id).max().unwrap_or(0) + 1;
-    todos.todos.push(Todo { id, text: text.to_string(), status: Status::Open });
+    todos.todos.push(Todo {
+        id,
+        text: text.to_string(),
+        status: Status::Open,
+    });
     format!("TODO created: {} [#{}]", text, id)
 }
 
@@ -136,11 +147,19 @@ fn todo_transition(todos: &mut Todos, id: usize, status: Status) -> Option<Strin
         Status::Done => "completed",
         Status::Open => "reopened",
     };
-    todos.todos.iter_mut().find(|t| t.id == id).map(|t| {
-        let msg = format!("TODO {}: {} [#{}]", label, t.text, id);
-        t.status = status;
-        msg
-    }).or_else(|| { eprintln!("Todo #{} not found", id); None })
+    todos
+        .todos
+        .iter_mut()
+        .find(|t| t.id == id)
+        .map(|t| {
+            let msg = format!("TODO {}: {} [#{}]", label, t.text, id);
+            t.status = status;
+            msg
+        })
+        .or_else(|| {
+            eprintln!("Todo #{} not found", id);
+            None
+        })
 }
 
 fn todo_rm(todos: &mut Todos, id: usize) {
@@ -152,11 +171,19 @@ fn todo_rm(todos: &mut Todos, id: usize) {
 }
 
 fn todo_reword(todos: &mut Todos, id: usize, new_text: &str) -> Option<String> {
-    todos.todos.iter_mut().find(|t| t.id == id).map(|t| {
-        let old = t.text.clone();
-        t.text = new_text.to_string();
-        format!("TODO reworded: {} → {} [#{}]", old, new_text, id)
-    }).or_else(|| { eprintln!("Todo #{} not found", id); None })
+    todos
+        .todos
+        .iter_mut()
+        .find(|t| t.id == id)
+        .map(|t| {
+            let old = t.text.clone();
+            t.text = new_text.to_string();
+            format!("TODO reworded: {} → {} [#{}]", old, new_text, id)
+        })
+        .or_else(|| {
+            eprintln!("Todo #{} not found", id);
+            None
+        })
 }
 
 // --- Log ---
@@ -409,21 +436,21 @@ fn main() {
 }
 
 /*
-* TODO:
-* - [x] If no args are provided, spit out the last n-lines of the log
-* - [x] Todo management (rlg todo "text" / ls / start / done / rm)
-* - [ ] Create a minimal TUI
-*   - [ ] Add creation of new log lines
-*   - [ ] Add view of existing log lines
-*   - [ ] Add deletion of existing log lines
-* - [x] Create a default config if one isn't found. Let the user know.
-* - [x] Add a ~/.config/rlg.toml config file allowing a custom default log file location
-* - [x] Create a new file with appropriate headers if one doesn't exist
-* - [x] Only open the file once and pass it around
-* - [x] Get default log file working
-* - [x] Reverse the printout of last lines
-* - [x] Append text to file
-* - [x] Add timestamp to file
-* - [x] Add day header whenever the day changes
-* - [x] Add year header whenever the year changes
-*/
+ * TODO:
+ * - [x] If no args are provided, spit out the last n-lines of the log
+ * - [x] Todo management (rlg todo "text" / ls / start / done / rm)
+ * - [ ] Create a minimal TUI
+ *   - [ ] Add creation of new log lines
+ *   - [ ] Add view of existing log lines
+ *   - [ ] Add deletion of existing log lines
+ * - [x] Create a default config if one isn't found. Let the user know.
+ * - [x] Add a ~/.config/rlg.toml config file allowing a custom default log file location
+ * - [x] Create a new file with appropriate headers if one doesn't exist
+ * - [x] Only open the file once and pass it around
+ * - [x] Get default log file working
+ * - [x] Reverse the printout of last lines
+ * - [x] Append text to file
+ * - [x] Add timestamp to file
+ * - [x] Add day header whenever the day changes
+ * - [x] Add year header whenever the year changes
+ */
